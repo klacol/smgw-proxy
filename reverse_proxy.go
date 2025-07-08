@@ -35,9 +35,11 @@ func main() {
 	}
 
 	proxy := &httputil.ReverseProxy{
-		Rewrite: func(pr *httputil.ProxyRequest) {
+		Director: func(req *http.Request) {
 			targetURL, _ := url.Parse(fmt.Sprintf("https://%s/", *targetIP))
-			pr.SetURL(targetURL)
+			req.URL.Scheme = targetURL.Scheme
+			req.URL.Host = targetURL.Host
+			// Optional: Pfad anpassen, falls nötig
 		},
 		ModifyResponse: func(pr *http.Response) error {
 			setCookie := pr.Header.Get("Set-Cookie")
@@ -46,9 +48,7 @@ func main() {
 				newSetCookie := strings.Replace(setCookie, ";secure", "", -1)
 				pr.Header.Set("Set-Cookie", newSetCookie)
 			}
-
 			return nil
-
 		},
 		Transport: insecureTransport,
 	}

@@ -26,8 +26,13 @@ flowchart TD
 In diesem Repository liegt der Code für einen Proxy in der Programmiersprache GO. Er wird folgendermassen auf einem Raspberry Pi installiert (z.B. mit PI OS als Betriebssystem):
 
 ```shell
+# Linux aktualisieren und GO installieren
 sudo apt update && sudo apt upgrade -y
 sudo apt install golang git -y
 
+# Go-Proxy kompilieren
+git clone https://github.com/klacol/smgw-proxy
+cd smgw-proxy
+go build reverse_proxy.go
 
 ```
