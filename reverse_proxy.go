@@ -56,6 +56,7 @@ func main() {
 			req.URL.Scheme = targetURL.Scheme
 			req.URL.Host = targetURL.Host
 			// Optional: Pfad anpassen, falls nötig
+			log.Printf("Proxy-Director: forwarding to %s", req.URL.String())
 		},
 		ModifyResponse: func(pr *http.Response) error {
 			setCookie := pr.Header.Get("Set-Cookie")
@@ -80,7 +81,7 @@ type ProxyHandler struct {
 	p *httputil.ReverseProxy
 }
 
-func (ph *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (proxyHandler *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Request-URL und Body loggen
 	log.Printf("Proxying request: %s %s", r.Method, r.URL.String())
 	if r.Body != nil {
@@ -95,7 +96,7 @@ func (ph *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
 		}
 	}
-	ph.p.ServeHTTP(w, r)
+	proxyHandler.p.ServeHTTP(w, r)
 }
 
 type DumpTransport struct {
