@@ -108,11 +108,23 @@ sudo systemctl enable reverse_proxy
 sudo systemctl start reverse_proxy
 ```
 
-Log einsehen:
+
+## Aufrufen:
+Das SMGW sollte nun unter http://192.168.0.101:8080/ erreichbar sein. Die Requests werden im Log ausgegeben. Das Log kann so eingesehen werden:
 
 ```shell 
 journalctl -u reverse_proxy -f
 ```
 
+## Nutzung in Home Assistant:
 
-HINWEIS: Diese Anleitung ist insgesamt viel zu komplex für einen normaler deutschen Menschen, der einfach nur das SMGW für seine Energiewende nutzen will. Daher sollten die Messstellenbetreiber IMHO die SMGW's so ausliefern, dass sie für normale Menschen nutzbar sind. Dazu müssen sie DHCP aktiviert haben am HAN/LAN-Port.
+Nutze nun das SMGW in Home Assistant auf Basis [dieser Anleitung](https://github.com/jannickfahlbusch/ha-ppc-smgw?tab=readme-ov-file#configuration).
+
+* URL = http://192.168.0.101:8080/smgw/m2m/ETHE0300186023.sm/json
+* Username = ****
+* Password = ***
+* Update Interval = 1
+
+## Hinweis
+
+Diese Anleitung ist insgesamt viel zu komplex für einen normaler deutschen Menschen, der einfach nur das SMGW für seine Energiewende nutzen will. Daher sollten die Messstellenbetreiber IMHO die SMGW's so ausliefern, dass sie für normale Menschen nutzbar sind. Dazu müssen sie DHCP aktiviert haben am HAN/LAN-Port.
