@@ -88,6 +88,8 @@ func (ph *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("Fehler beim Lesen des Request-Bodys: %v", err)
 		} else {
+			log.Printf("RemoteAddr: %s", r.RemoteAddr)
+			log.Printf("Headers: %v", r.Header)
 			log.Printf("Request-Body: %s", string(bodyBytes))
 			// Body für den nächsten Handler wiederherstellen
 			r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
