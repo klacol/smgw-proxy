@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -16,6 +17,15 @@ func main() {
 	targetIP := flag.String("target", "10.11.120.2", "IP-Adresse des HAN Ports des Smart Meter Gateways")
 	listenPort := flag.String("port", "8080", "Port, auf dem der SMGW-Proxy lauschen soll")
 	flag.Parse()
+
+	addrs, err := net.InterfaceAddrs()
+	if err == nil {
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+				log.Printf("Lokale IP-Adresse: %s", ipnet.IP.String())
+			}
+		}
+	}
 
 	// Log-Ausgabe mit Konfigurationsdetails
 	log.Printf("Starting reverse proxy - listening on port %s, forwarding to https://%s/\n", *listenPort, *targetIP)
@@ -54,7 +64,7 @@ func main() {
 	}
 
 	http.Handle("/", &ProxyHandler{proxy})
-	err := http.ListenAndServe(":"+*listenPort, nil)
+	err = http.ListenAndServe(":"+*listenPort, nil)
 	if err != nil {
 		panic(err)
 	}
