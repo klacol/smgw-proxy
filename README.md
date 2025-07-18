@@ -110,7 +110,12 @@ sudo systemctl start reverse_proxy
 
 
 ## Aufrufen:
-Das SMGW sollte nun unter http://192.168.0.101:8080/ erreichbar sein. Die Requests werden im Log ausgegeben. Das Log kann so eingesehen werden:
+
+Das SMGW sollte nun unter der IP-Adresse erreichbar sein, die der WLan Netzwerkport des Raspberry Pi bekommen hat. Der Standardport ist 8080. 
+
+z.B. http://192.168.0.101:8080/
+
+Die Requests werden im Log ausgegeben. Das Log kann auf dem Raspberry Pi so eingesehen werden:
 
 ```shell 
 journalctl -u reverse_proxy -f
