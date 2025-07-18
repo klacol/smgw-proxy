@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -18,6 +19,11 @@ func main() {
 	listenPort := flag.String("port", "8080", "Port, auf dem der SMGW-Proxy lauschen soll")
 	flag.Parse()
 
+	// Log-Level auf Debug setzen
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.Printf("Starting reverse proxy")
+	// Lokale IP-Adressen ausgeben
+	log.Println("Lokale IP-Adressen:")
 	addrs, err := net.InterfaceAddrs()
 	if err == nil {
 		for _, addr := range addrs {
@@ -75,7 +81,18 @@ type ProxyHandler struct {
 }
 
 func (ph *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Request received, proxing path %s (Method %s)\n", r.URL.Path, r.Method)
+	// Request-URL und Body loggen
+	log.Printf("Proxying request: %s %s", r.Method, r.URL.String())
+	if r.Body != nil {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Fehler beim Lesen des Request-Bodys: %v", err)
+		} else {
+			log.Printf("Request-Body: %s", string(bodyBytes))
+			// Body für den nächsten Handler wiederherstellen
+			r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+		}
+	}
 	ph.p.ServeHTTP(w, r)
 }
 

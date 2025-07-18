@@ -107,6 +107,17 @@ sudo systemctl start reverse_proxy
 ```
 
 
+Proxy aktualisieren
+
+```shell
+# Go-Proxy kompilieren
+cd smgw-proxy
+git pull
+go build -o reverse_proxy reverse_proxy.go
+sudo systemctl restart reverse_proxy
+journalctl -u reverse_proxy -f
+```
+
 ## Aufrufen:
 
 Das SMGW sollte nun unter der IP-Adresse erreichbar sein, die der WLan Netzwerkport des Raspberry Pi bekommen hat. Der Standardport ist 8080. 
