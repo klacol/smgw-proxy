@@ -81,22 +81,22 @@ type ProxyHandler struct {
 	p *httputil.ReverseProxy
 }
 
-func (proxyHandler *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (proxyHandler *ProxyHandler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	// Request-URL und Body loggen
-	log.Printf("Proxying request: %s %s", r.Method, r.URL.String())
-	if r.Body != nil {
-		bodyBytes, err := io.ReadAll(r.Body)
+	log.Printf("Proxying request: %s %s", request.Method, request.URL.String())
+	if request.Body != nil {
+		bodyBytes, err := io.ReadAll(request.Body)
 		if err != nil {
-			log.Printf("Fehler beim Lesen des Request-Bodys: %v", err)
+			log.Printf("Fehler beim Lesen des Request-Body: %v", err)
 		} else {
-			log.Printf("RemoteAddr: %s", r.RemoteAddr)
-			log.Printf("Headers: %v", r.Header)
+			log.Printf("RemoteAddr: %s %s", request.Method, request.RemoteAddr)
+			log.Printf("Headers: %v", request.Header)
 			log.Printf("Request-Body: %s", string(bodyBytes))
 			// Body für den nächsten Handler wiederherstellen
-			r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+			request.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
 		}
 	}
-	proxyHandler.p.ServeHTTP(w, r)
+	proxyHandler.p.ServeHTTP(responseWriter, request)
 }
 
 type DumpTransport struct {

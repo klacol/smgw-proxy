@@ -101,6 +101,7 @@ WantedBy=multi-user.target
 Service aktivieren und starten:
 
 ```shell 
+sudo timedatectl set-timezone Europe/Berlin
 sudo systemctl daemon-reload
 sudo systemctl enable reverse_proxy
 sudo systemctl start reverse_proxy
