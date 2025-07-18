@@ -73,8 +73,6 @@ sudo apt install golang git -y
 # Go-Proxy kompilieren
 git clone https://github.com/klacol/smgw-proxy
 cd smgw-proxy
-
-
 ```
 
 Um den reverse_proxy nach jedem Neustart automatisch zu starten und die Logs einzusehen, empfiehlt sich ein systemd-Service. So geht’s:
@@ -114,6 +112,10 @@ sudo systemctl start reverse_proxy
 Das SMGW sollte nun unter der IP-Adresse erreichbar sein, die der WLan Netzwerkport des Raspberry Pi bekommen hat. Der Standardport ist 8080. 
 
 z.B. http://192.168.0.101:8080/
+
+Das sieht dan z.Bm im Browser (nach Eingabe der Zugangsdaten) so aus:
+
+![Alt-Text](/Pics/Theben-Statusinformation.png)
 
 Die Requests werden im Log ausgegeben. Das Log kann auf dem Raspberry Pi so eingesehen werden:
 
