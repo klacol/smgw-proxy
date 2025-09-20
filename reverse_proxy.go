@@ -47,6 +47,10 @@ func main() {
 	// Log-Level auf Debug setzen
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Printf("Starting reverse proxy with rotating log file in: %s", *logDir)
+
+	// Zertifikate im Verzeichnis auflisten
+	listCertificates(*certDir)
+
 	// Lokale IP-Adressen ausgeben
 	log.Println("Lokale IP-Adressen:")
 	addrs, err := net.InterfaceAddrs()
@@ -245,10 +249,50 @@ type CertInfo struct {
 // Stellt sicher, dass das angegebene Verzeichnis existiert
 func ensureDirectory(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		log.Printf("Erstelle Zertifikatsverzeichnis: %s", dir)
+		log.Printf("Erstelle Verzeichnis: %s", dir)
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			log.Fatalf("Fehler beim Erstellen des Zertifikatsverzeichnisses: %v", err)
+			log.Fatalf("Fehler beim Erstellen des Verzeichnisses: %v", err)
+		}
+		log.Printf("Verzeichnis erfolgreich erstellt: %s", dir)
+	} else {
+		log.Printf("Verzeichnis gefunden: %s", dir)
+	}
+}
+
+// Listet alle Zertifikate im angegebenen Verzeichnis auf
+func listCertificates(certDir string) {
+	files, err := os.ReadDir(certDir)
+	if err != nil {
+		log.Printf("Fehler beim Lesen des Zertifikatsverzeichnisses: %v", err)
+		return
+	}
+
+	if len(files) == 0 {
+		log.Printf("Keine Zertifikate im Verzeichnis %s gefunden", certDir)
+		return
+	}
+
+	log.Printf("Gefundene Zertifikate im Verzeichnis %s:", certDir)
+
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
+			// Extrahiere Hostnamen aus dem Dateinamen
+			hostName := strings.TrimSuffix(file.Name(), ".json")
+
+			// Versuche das Zertifikat zu laden, um Details zu erhalten
+			certInfo, err := loadCertificate(certDir, hostName)
+			if err != nil {
+				log.Printf("  - %s (Fehler beim Laden: %v)", file.Name(), err)
+				continue
+			}
+
+			if certInfo != nil {
+				log.Printf("  - Host: %s", hostName)
+				log.Printf("    Fingerprint: %s", certInfo.Fingerprint)
+				log.Printf("    Subject: %s", certInfo.Subject)
+				log.Printf("    Gültig bis: %s", certInfo.NotAfter)
+			}
 		}
 	}
 }
@@ -275,7 +319,7 @@ func saveCertificate(certDir, host string, cert *x509.Certificate) error {
 	certFilePath := filepath.Join(certDir, host+".json")
 	err = os.WriteFile(certFilePath, jsonData, 0644)
 	if err != nil {
-		return fmt.Errorf("Fehler beim Speichern der Zertifikatsinformationen: %v", err)
+		return fmt.Errorf("fehler beim speichern der zertifikatsinformationen: %v", err)
 	}
 
 	log.Printf("Zertifikat für %s gespeichert (Fingerprint: %s)", host, fingerprintStr)
@@ -292,13 +336,13 @@ func loadCertificate(certDir, host string) (*CertInfo, error) {
 
 	jsonData, err := os.ReadFile(certFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("Fehler beim Lesen der Zertifikatsdatei: %v", err)
+		return nil, fmt.Errorf("fehler beim lesen der zertifikatsdatei: %v", err)
 	}
 
 	var certInfo CertInfo
 	err = json.Unmarshal(jsonData, &certInfo)
 	if err != nil {
-		return nil, fmt.Errorf("Fehler beim Deserialisieren der Zertifikatsinformationen: %v", err)
+		return nil, fmt.Errorf("fehler beim deserialisieren der zertifikatsinformationen: %v", err)
 	}
 
 	return &certInfo, nil
@@ -312,12 +356,12 @@ func createTOFUTransport(host, certDir string) *http.Transport {
 			VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 				// Konvertiert das erste Zertifikat
 				if len(rawCerts) == 0 {
-					return fmt.Errorf("keine Zertifikate vom Server erhalten")
+					return fmt.Errorf("keine zertifikate vom server erhalten")
 				}
 
 				cert, err := x509.ParseCertificate(rawCerts[0])
 				if err != nil {
-					return fmt.Errorf("Fehler beim Parsen des Serverzertifikats: %v", err)
+					return fmt.Errorf("fehler beim parsen des serverzertifikats: %v", err)
 				}
 
 				// Berechne den Fingerprint des aktuellen Zertifikats
@@ -327,7 +371,7 @@ func createTOFUTransport(host, certDir string) *http.Transport {
 				// Lade das gespeicherte Zertifikat
 				savedCert, err := loadCertificate(certDir, host)
 				if err != nil {
-					return fmt.Errorf("Fehler beim Laden des gespeicherten Zertifikats: %v", err)
+					return fmt.Errorf("fehler beim laden des gespeicherten zertifikats: %v", err)
 				}
 
 				// Wenn kein Zertifikat gespeichert ist, speichere das aktuelle Zertifikat (Trust On First Use)
@@ -341,7 +385,7 @@ func createTOFUTransport(host, certDir string) *http.Transport {
 					log.Printf("WARNUNG: Zertifikat für %s hat sich geändert!", host)
 					log.Printf("Gespeicherter Fingerprint: %s", savedCert.Fingerprint)
 					log.Printf("Aktueller Fingerprint: %s", currentFingerprintStr)
-					return fmt.Errorf("Zertifikat hat sich geändert! Möglicher man-in-the-middle-Angriff oder Zertifikat wurde erneuert")
+					return fmt.Errorf("zertifikat hat sich geändert! möglicher man-in-the-middle-angriff oder zertifikat wurde erneuert")
 				}
 
 				log.Printf("Zertifikats-Validierung erfolgreich für %s", host)
