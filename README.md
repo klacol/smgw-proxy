@@ -87,7 +87,7 @@ Description=Reverse Proxy für SMGW
 After=network-online.target
 
 [Service]
-ExecStart=/home/pi/smgw-proxy/reverse_proxy
+ExecStart=/home/pi/smgw-proxy/reverse_proxy -logdir /var/log/smgw-proxy
 WorkingDirectory=/home/pi/smgw-proxy
 Restart=always
 User=pi
@@ -116,6 +116,39 @@ cd smgw-proxy
 git pull
 go build -o reverse_proxy reverse_proxy.go
 sudo systemctl restart reverse_proxy
+journalctl -u reverse_proxy -f
+```
+
+## Log-Dateien
+
+Der Proxy unterstützt das Speichern von Log-Dateien mit automatischer Rotation. Standardmäßig werden die Logs alle 24 Stunden rotiert, wobei alte Log-Dateien für bis zu 3 Tage aufbewahrt werden.
+
+### Konfiguration der Log-Dateien
+
+Der Proxy kann mit folgenden Parametern für das Logging konfiguriert werden:
+
+```shell
+./reverse_proxy -logdir /var/log/smgw-proxy -logfile proxy.log
+```
+
+**Parameter:**
+- `-logdir`: Verzeichnis zum Speichern der Log-Dateien (Standard: ./logs)
+- `-logfile`: Name der Log-Datei (Standard: proxy.log)
+
+Das Log-Verzeichnis wird automatisch erstellt, falls es nicht existiert. Die Log-Dateien werden mit Zeitstempel im Format `YYYY-MM-DD_HH-MM-SS_proxy.log` gespeichert und nach 24 Stunden automatisch rotiert.
+
+### Zugriff auf die Log-Dateien
+
+Die Log-Dateien können direkt im angegebenen Verzeichnis eingesehen werden:
+
+```shell
+ls -la /var/log/smgw-proxy
+cat /var/log/smgw-proxy/2025-09-20_12-00-00_proxy.log
+```
+
+Wenn der Proxy als systemd-Service konfiguriert ist, werden die Logs zusätzlich auch im Journal gespeichert und können mit `journalctl` abgerufen werden:
+
+```shell
 journalctl -u reverse_proxy -f
 ```
 

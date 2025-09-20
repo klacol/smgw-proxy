@@ -16,6 +16,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
 
 func main() {
@@ -23,14 +25,28 @@ func main() {
 	targetIP := flag.String("target", "10.11.120.2", "IP-Adresse des HAN Ports des Smart Meter Gateways")
 	listenPort := flag.String("port", "8080", "Port, auf dem der SMGW-Proxy lauschen soll")
 	certDir := flag.String("certdir", "./certs", "Verzeichnis zum Speichern der TOFU-Zertifikate")
+	logDir := flag.String("logdir", "./logs", "Verzeichnis zum Speichern der Log-Dateien")
+	logFile := flag.String("logfile", "proxy.log", "Name der Log-Datei")
 	flag.Parse()
 
 	// Sicherstellen, dass das Zertifikatsverzeichnis existiert
 	ensureDirectory(*certDir)
 
+	// Sicherstellen, dass das Log-Verzeichnis existiert
+	ensureDirectory(*logDir)
+
+	// Log-Datei konfigurieren
+	logWriter, err := NewRotatingFileWriter(*logDir, *logFile)
+	if err != nil {
+		log.Fatalf("Fehler beim Erstellen des Log-Writers: %v", err)
+	}
+
+	// Log auf Datei und Konsole umleiten
+	log.SetOutput(io.MultiWriter(os.Stdout, logWriter))
+
 	// Log-Level auf Debug setzen
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.Printf("Starting reverse proxy")
+	log.Printf("Starting reverse proxy with rotating log file in: %s", *logDir)
 	// Lokale IP-Adressen ausgeben
 	log.Println("Lokale IP-Adressen:")
 	addrs, err := net.InterfaceAddrs()
@@ -99,10 +115,50 @@ func (proxyHandler *ProxyHandler) ServeHTTP(responseWriter http.ResponseWriter, 
 	proxyHandler.p.ServeHTTP(responseWriter, request)
 }
 
+// RotatingFileWriter ist ein Writer, der alle 24 Stunden eine neue Log-Datei erstellt
+type RotatingFileWriter struct {
+	mutex       sync.Mutex
+	dir         string
+	filename    string
+	file        *os.File
+	createdTime time.Time
+}
+
+// NewRotatingFileWriter erstellt einen neuen Writer mit 24-Stunden-Rotation
+func NewRotatingFileWriter(dir, filename string) (*RotatingFileWriter, error) {
+	w := &RotatingFileWriter{
+		dir:      dir,
+		filename: filename,
+	}
+
+	if err := w.rotate(); err != nil {
+		return nil, err
+	}
+
+	return w, nil
+}
+
+// Write implementiert das io.Writer Interface
+func (w *RotatingFileWriter) Write(p []byte) (n int, err error) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	// Überprüfen, ob eine Rotation notwendig ist (24 Stunden seit Erstellung)
+	if time.Since(w.createdTime) >= 24*time.Hour {
+		if err := w.rotate(); err != nil {
+			return 0, err
+		}
+	}
+
+	return w.file.Write(p)
+}
+
+// DumpTransport ist ein Transport für HTTP-Requests, der Anfragen und Antworten ausgibt
 type DumpTransport struct {
 	r http.RoundTripper
 }
 
+// RoundTrip implementiert das http.RoundTripper Interface
 func (d *DumpTransport) RoundTrip(h *http.Request) (*http.Response, error) {
 	dump, _ := httputil.DumpRequestOut(h, true)
 	fmt.Printf("****REQUEST****\n%s\n", dump)
@@ -110,6 +166,70 @@ func (d *DumpTransport) RoundTrip(h *http.Request) (*http.Response, error) {
 	dump, _ = httputil.DumpResponse(resp, true)
 	fmt.Printf("****RESPONSE****\n%s\n****************\n\n", dump)
 	return resp, err
+}
+
+// rotate erstellt eine neue Log-Datei und schließt die alte
+func (w *RotatingFileWriter) rotate() error {
+	// Wenn es bereits eine Datei gibt, schließe sie
+	if w.file != nil {
+		w.file.Close()
+	}
+
+	// Neuen Dateinamen mit Zeitstempel erstellen
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	fullPath := filepath.Join(w.dir, fmt.Sprintf("%s_%s", timestamp, w.filename))
+
+	// Datei öffnen oder erstellen
+	file, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("fehler beim öffnen der log-datei: %v", err)
+	}
+
+	w.file = file
+	w.createdTime = time.Now()
+
+	// Alte Log-Dateien aufräumen (älter als 3 Tage)
+	go w.cleanupOldLogs()
+
+	return nil
+}
+
+// cleanupOldLogs entfernt Log-Dateien, die älter als 3 Tage sind
+func (w *RotatingFileWriter) cleanupOldLogs() {
+	files, err := os.ReadDir(w.dir)
+	if err != nil {
+		log.Printf("Fehler beim Lesen des Log-Verzeichnisses: %v", err)
+		return
+	}
+
+	// Datum von vor 3 Tagen
+	cutoffTime := time.Now().Add(-72 * time.Hour)
+
+	for _, file := range files {
+		if !file.IsDir() && strings.Contains(file.Name(), w.filename) {
+			// Versuche, das Datum aus dem Dateinamen zu extrahieren
+			parts := strings.Split(file.Name(), "_")
+			if len(parts) < 3 {
+				continue
+			}
+
+			dateStr := parts[0] + "_" + parts[1]
+			fileTime, err := time.Parse("2006-01-02_15-04-05", dateStr)
+			if err != nil {
+				continue
+			}
+
+			if fileTime.Before(cutoffTime) {
+				// Datei ist älter als 3 Tage, löschen
+				fullPath := filepath.Join(w.dir, file.Name())
+				if err := os.Remove(fullPath); err != nil {
+					log.Printf("Fehler beim Löschen der alten Log-Datei %s: %v", fullPath, err)
+				} else {
+					log.Printf("Alte Log-Datei gelöscht: %s", fullPath)
+				}
+			}
+		}
+	}
 }
 
 // CertInfo speichert Informationen über ein Zertifikat
@@ -149,7 +269,7 @@ func saveCertificate(certDir, host string, cert *x509.Certificate) error {
 
 	jsonData, err := json.MarshalIndent(certInfo, "", "  ")
 	if err != nil {
-		return fmt.Errorf("Fehler beim Serialisieren der Zertifikatsinformationen: %v", err)
+		return fmt.Errorf("fehler beim serialisieren der zertifikatsinformationen: %v", err)
 	}
 
 	certFilePath := filepath.Join(certDir, host+".json")
@@ -192,7 +312,7 @@ func createTOFUTransport(host, certDir string) *http.Transport {
 			VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 				// Konvertiert das erste Zertifikat
 				if len(rawCerts) == 0 {
-					return fmt.Errorf("Keine Zertifikate vom Server erhalten")
+					return fmt.Errorf("keine Zertifikate vom Server erhalten")
 				}
 
 				cert, err := x509.ParseCertificate(rawCerts[0])
@@ -221,10 +341,10 @@ func createTOFUTransport(host, certDir string) *http.Transport {
 					log.Printf("WARNUNG: Zertifikat für %s hat sich geändert!", host)
 					log.Printf("Gespeicherter Fingerprint: %s", savedCert.Fingerprint)
 					log.Printf("Aktueller Fingerprint: %s", currentFingerprintStr)
-					return fmt.Errorf("Zertifikat hat sich geändert! Möglicher Man-in-the-Middle-Angriff oder Zertifikat wurde erneuert")
+					return fmt.Errorf("Zertifikat hat sich geändert! Möglicher man-in-the-middle-Angriff oder Zertifikat wurde erneuert")
 				}
 
-				log.Printf("Zertifikatsvalidierung erfolgreich für %s", host)
+				log.Printf("Zertifikats-Validierung erfolgreich für %s", host)
 				return nil
 			},
 		},
