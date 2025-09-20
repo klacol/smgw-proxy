@@ -119,6 +119,40 @@ sudo systemctl restart reverse_proxy
 journalctl -u reverse_proxy -f
 ```
 
+## Trust On First Use (TOFU) für TLS-Verbindungen
+
+Der Proxy unterstützt Trust On First Use (TOFU) für sichere TLS-Verbindungen mit dem Smart Meter Gateway. Dies ist besonders wichtig, da viele SMGW nur über HTTPS erreichbar sind und selbstsignierte Zertifikate verwenden.
+
+### Was ist TOFU?
+
+TOFU (Trust On First Use) ist ein Sicherheitskonzept, bei dem bei der ersten Verbindung zu einem Server dessen Zertifikat automatisch als vertrauenswürdig akzeptiert und gespeichert wird. Bei allen nachfolgenden Verbindungen wird das vom Server präsentierte Zertifikat mit dem gespeicherten verglichen. Dies bietet Schutz vor Man-in-the-Middle-Angriffen, ohne dass Zertifikate manuell installiert werden müssen.
+
+### Funktionsweise
+
+1. **Erste Verbindung**: Bei der ersten Verbindung zum SMGW wird das Zertifikat akzeptiert und in einem konfigurierbaren Verzeichnis gespeichert.
+2. **Folgende Verbindungen**: Bei allen nachfolgenden Verbindungen wird das präsentierte Zertifikat mit dem gespeicherten verglichen.
+3. **Zertifikatswechsel**: Wenn sich das Zertifikat ändert, wird die Verbindung abgelehnt und eine Warnmeldung ausgegeben. Dies könnte auf einen Man-in-the-Middle-Angriff hindeuten oder darauf, dass das Zertifikat erneuert wurde.
+
+### Konfiguration
+
+Der Proxy kann mit dem Parameter `-certdir` konfiguriert werden, um das Verzeichnis für die TOFU-Zertifikatsspeicherung anzugeben:
+
+```shell
+./reverse_proxy -target 10.11.120.2 -port 8080 -certdir ./zertifikate
+```
+
+**Parameter:**
+- `-target`: IP-Adresse des HAN-Ports des Smart Meter Gateways (Standard: 10.11.120.2)
+- `-port`: Port, auf dem der SMGW-Proxy lauschen soll (Standard: 8080)
+- `-certdir`: Verzeichnis zum Speichern der TOFU-Zertifikate (Standard: ./certs)
+
+### Sicherheitshinweise
+
+- Das TOFU-Prinzip bietet eine gute Sicherheit, wenn die erste Verbindung nicht manipuliert wurde.
+- Wenn Sie eine Warnmeldung über ein geändertes Zertifikat erhalten, sollten Sie dies überprüfen:
+  - Bei einem legitimen Zertifikatswechsel: Löschen Sie die gespeicherte Zertifikatsdatei im Zertifikatsverzeichnis.
+  - Bei Verdacht auf einen Angriff: Überprüfen Sie Ihre Netzwerksicherheit.
+
 ## Aufrufen:
 
 Das SMGW sollte nun unter der IP-Adresse erreichbar sein, die der WLan Netzwerkport des Raspberry Pi bekommen hat. Der Standardport ist 8080. 
