@@ -114,6 +114,7 @@ Proxy aktualisieren
 # Go-Proxy kompilieren
 cd smgw-proxy
 git pull
+sudo systemctl stop reverse_proxy
 go build -o reverse_proxy reverse_proxy.go
 sudo systemctl restart reverse_proxy
 journalctl -u reverse_proxy -f

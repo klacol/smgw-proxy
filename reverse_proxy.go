@@ -336,13 +336,13 @@ func loadCertificate(certDir, host string) (*CertInfo, error) {
 
 	jsonData, err := os.ReadFile(certFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim lesen der zertifikatsdatei: %v", err)
+		return nil, fmt.Errorf("Fehler beim Lesen der Zertifikatsdatei: %v", err)
 	}
 
 	var certInfo CertInfo
 	err = json.Unmarshal(jsonData, &certInfo)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim deserialisieren der zertifikatsinformationen: %v", err)
+		return nil, fmt.Errorf("Fehler beim Deserialisieren der Zertifikatsinformationen: %v", err)
 	}
 
 	return &certInfo, nil
@@ -356,22 +356,33 @@ func createTOFUTransport(host, certDir string) *http.Transport {
 			VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 				// Konvertiert das erste Zertifikat
 				if len(rawCerts) == 0 {
-					return fmt.Errorf("keine zertifikate vom server erhalten")
+					return fmt.Errorf("Keine Zertifikate vom Server erhalten")
 				}
 
 				cert, err := x509.ParseCertificate(rawCerts[0])
 				if err != nil {
-					return fmt.Errorf("fehler beim parsen des serverzertifikats: %v", err)
+					return fmt.Errorf("Fehler beim Parsen des Serverzertifikats: %v", err)
+				}
+
+				// Logge detaillierte Informationen über das verwendete Zertifikat
+				log.Printf("TLS-Verbindung: Zertifikat für Host %s", host)
+				log.Printf("Zertifikat Subject: %s", cert.Subject.String())
+				log.Printf("Zertifikat Issuer: %s", cert.Issuer.String())
+				log.Printf("Zertifikat gültig von: %s", cert.NotBefore.Format(time.RFC3339))
+				log.Printf("Zertifikat gültig bis: %s", cert.NotAfter.Format(time.RFC3339))
+				if len(cert.DNSNames) > 0 {
+					log.Printf("Zertifikat DNS-Namen: %s", strings.Join(cert.DNSNames, ", "))
 				}
 
 				// Berechne den Fingerprint des aktuellen Zertifikats
 				currentFingerprint := sha256.Sum256(cert.Raw)
 				currentFingerprintStr := fmt.Sprintf("%x", currentFingerprint)
+				log.Printf("Zertifikat SHA-256 Fingerprint: %s", currentFingerprintStr)
 
 				// Lade das gespeicherte Zertifikat
 				savedCert, err := loadCertificate(certDir, host)
 				if err != nil {
-					return fmt.Errorf("fehler beim laden des gespeicherten zertifikats: %v", err)
+					return fmt.Errorf("Fehler beim Laden des gespeicherten Zertifikats: %v", err)
 				}
 
 				// Wenn kein Zertifikat gespeichert ist, speichere das aktuelle Zertifikat (Trust On First Use)
@@ -385,7 +396,7 @@ func createTOFUTransport(host, certDir string) *http.Transport {
 					log.Printf("WARNUNG: Zertifikat für %s hat sich geändert!", host)
 					log.Printf("Gespeicherter Fingerprint: %s", savedCert.Fingerprint)
 					log.Printf("Aktueller Fingerprint: %s", currentFingerprintStr)
-					return fmt.Errorf("zertifikat hat sich geändert! möglicher man-in-the-middle-angriff oder zertifikat wurde erneuert")
+					return fmt.Errorf("Zertifikat hat sich geändert! Möglicher man-in-the-middle-angriff oder Zertifikat wurde erneuert")
 				}
 
 				log.Printf("Zertifikats-Validierung erfolgreich für %s", host)
