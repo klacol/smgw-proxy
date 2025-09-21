@@ -73,6 +73,11 @@ sudo apt install golang git -y
 # Go-Proxy kompilieren
 git clone https://github.com/klacol/smgw-proxy
 cd smgw-proxy
+
+# Log-Verzeichnis anlegen
+sudo mkdir -p /var/log/smgw-proxy
+sudo chown pi:pi /var/log/smgw-proxy
+
 ```
 
 Um den reverse_proxy nach jedem Neustart automatisch zu starten und die Logs einzusehen, empfiehlt sich ein systemd-Service. So geht’s:
